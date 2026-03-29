@@ -1,10 +1,10 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { PrivateRoute, PublicRoute } from './router';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 
 // Placeholder components - these will be created later
-const Login = () => <div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Login Page</h1></div>;
-const Dashboard = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Dashboard</h1></div>;
 const Employees = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Employees</h1></div>;
 const Search = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Search</h1></div>;
 const Upload = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Bulk Upload</h1></div>;
@@ -17,7 +17,7 @@ function App() {
         path="/login" 
         element={
           <PublicRoute>
-            <Login />
+            <LoginPage />
           </PublicRoute>
         } 
       />
@@ -27,7 +27,7 @@ function App() {
         path="/dashboard" 
         element={
           <PrivateRoute>
-            <Dashboard />
+            <DashboardPage />
           </PrivateRoute>
         } 
       />
