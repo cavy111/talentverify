@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_filters',
+    'django_ratelimit',
     'core',
 ]
 
@@ -201,3 +202,24 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Field Encryption
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY')
+
+# Security Headers
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Secure cookies (environment-gated for development)
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# Rate Limiting Configuration
+RATELIMIT_ENABLE = True
+RATELIMIT_USE_CACHE = 'default'
+
+# Rate limit for login endpoint: 5 attempts per minute per IP
+RATELIMIT_VIEW = 'core.views.auth_views.login_view:5/m'

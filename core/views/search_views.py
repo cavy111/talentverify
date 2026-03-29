@@ -4,10 +4,11 @@ import hashlib
 import json
 from django.core.cache import cache
 from django.utils import timezone
-from rest_framework import status, permissions, pagination
+from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q
+from django_ratelimit.decorators import ratelimit
 from core.models import Employee, EmploymentRecord, AuditLog
 from core.serializers.employee_serializers import EmployeeSerializer
 
@@ -128,6 +129,7 @@ class SearchView(APIView):
     permission_classes = [permissions.AllowAny]
     pagination_class = SearchPagination
     
+    @ratelimit(key='ip', rate='30/m', method='GET')
     def get(self, request):
         """Search employees with multiple filters"""
         ip_address = get_client_ip(request)

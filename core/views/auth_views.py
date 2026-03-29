@@ -2,12 +2,14 @@ from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from django_ratelimit.decorators import ratelimit
 from core.serializers.auth_serializers import LoginSerializer, MeSerializer
 from core.models import User
 
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@ratelimit(key='ip', rate='5/m', method='POST')
 def login_view(request):
     """
     Login view using SimpleJWT that returns access + refresh tokens

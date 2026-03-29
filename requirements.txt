@@ -6,6 +6,7 @@ cryptography
 psycopg2-binary
 python-decouple
 django-filter
+django-ratelimit
 openpyxl
 pandas
 celery
