@@ -1,0 +1,218 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_talentverify
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Set up environment variables
+      env:
+        SECRET_KEY: test-secret-key-for-ci
+        DB_NAME: test_talentverify
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_HOST: localhost
+        DB_PORT: 5432
+        REDIS_URL: redis://localhost:6379/0
+        FIELD_ENCRYPTION_KEY: test-encryption-key-32-chars-long
+        SEARCH_HMAC_KEY: test-hmac-key-for-testing
+        TV_ADMIN_EMAIL: admin@test.com
+        TV_ADMIN_PASSWORD: admin123
+      run: |
+        echo "SECRET_KEY=$SECRET_KEY" >> .env
+        echo "DB_NAME=$DB_NAME" >> .env
+        echo "DB_USER=$DB_USER" >> .env
+        echo "DB_PASSWORD=$DB_PASSWORD" >> .env
+        echo "DB_HOST=$DB_HOST" >> .env
+        echo "DB_PORT=$DB_PORT" >> .env
+        echo "REDIS_URL=$REDIS_URL" >> .env
+        echo "FIELD_ENCRYPTION_KEY=$FIELD_ENCRYPTION_KEY" >> .env
+        echo "SEARCH_HMAC_KEY=$SEARCH_HMAC_KEY" >> .env
+        echo "TV_ADMIN_EMAIL=$TV_ADMIN_EMAIL" >> .env
+        echo "TV_ADMIN_PASSWORD=$TV_ADMIN_PASSWORD" >> .env
+
+    - name: Wait for services
+      run: |
+        timeout 60 bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
+        timeout 60 bash -c 'until redis-cli ping; do sleep 1; done'
+
+    - name: Run database migrations
+      run: |
+        python manage.py makemigrations --noinput
+        python manage.py migrate --noinput
+
+    - name: Create superuser
+      run: |
+        python manage.py create_default_roles
+
+    - name: Run tests
+      run: |
+        python manage.py test core.tests.test_security
+
+    - name: Run security tests
+      run: |
+        python manage.py test --verbosity=2
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: talentverify/talentverify
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: root
+        key: ${{ secrets.VPS_KEY }}
+        script: |
+          # Set environment variables
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "FIELD_ENCRYPTION_KEY=${{ secrets.FIELD_ENCRYPTION_KEY }}" >> .env
+          echo "SEARCH_HMAC_KEY=${{ secrets.SEARCH_HMAC_KEY }}" >> .env
+          echo "TV_ADMIN_EMAIL=${{ secrets.TV_ADMIN_EMAIL }}" >> .env
+          echo "TV_ADMIN_PASSWORD=${{ secrets.TV_ADMIN_PASSWORD }}" >> .env
+          echo "DEBUG=False" >> .env
+          echo "DB_NAME=talentverify" >> .env
+          echo "DB_USER=postgres" >> .env
+          echo "DB_HOST=db" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "REDIS_URL=redis://redis:6379/0" >> .env
+          echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" >> .env
+          
+          # Pull latest images and restart services
+          docker-compose pull
+          docker-compose up -d --force-recreate
+          
+          # Wait for services to be healthy
+          sleep 30
+          
+          # Run database migrations
+          docker-compose exec web python manage.py migrate
+          
+          # Create superuser if doesn't exist
+          docker-compose exec web python manage.py create_default_roles || true
+          
+          # Collect static files
+          docker-compose exec web python manage.py collectstatic --noinput
+          
+          # Show status
+          docker-compose ps
+
+    - name: Health check
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: root
+        key: ${{ secrets.VPS_KEY }}
+        script: |
+          # Wait for application to be ready
+          sleep 60
+          
+          # Health check
+          curl -f http://localhost/health || exit 1
+          
+          # Check API health
+          curl -f http://localhost/api/auth/me/ || exit 1
+          
+          echo "Deployment successful!"
+
+    - name: Notify on success
+      if: success()
+      run: |
+        echo "🚀 Talent Verify deployed successfully!"
+        echo "🌐 https://${{ secrets.DOMAIN }}"
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        echo "Check the logs for more information."
