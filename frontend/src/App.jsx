@@ -3,9 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { PrivateRoute, PublicRoute } from './router';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import EmployeesPage from './pages/EmployeesPage';
+import EmployeeDetailPage from './pages/EmployeeDetailPage';
 
 // Placeholder components - these will be created later
-const Employees = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Employees</h1></div>;
 const Search = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Search</h1></div>;
 const Upload = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Bulk Upload</h1></div>;
 
@@ -35,7 +36,15 @@ function App() {
         path="/employees" 
         element={
           <PrivateRoute>
-            <Employees />
+            <EmployeesPage />
+          </PrivateRoute>
+        } 
+      />
+      <Route 
+        path="/employees/:id" 
+        element={
+          <PrivateRoute>
+            <EmployeeDetailPage />
           </PrivateRoute>
         } 
       />
