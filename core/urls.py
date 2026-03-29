@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import auth_views, company_views, employee_views
+from core.views import auth_views, company_views, employee_views, search_views
 
 # Create DRF router
 router = DefaultRouter()
@@ -19,6 +19,9 @@ urlpatterns = [
         path('logout/', auth_views.logout_view, name='logout'),
         path('me/', auth_views.me_view, name='me'),
     ])),
+    
+    # Search endpoint
+    path('search/', search_views.SearchView.as_view(), name='search'),
     
     # API endpoints with ViewSets
     path('', include(router.urls)),
