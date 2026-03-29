@@ -1,11 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from core.views import auth_views, company_views
+from core.views import auth_views, company_views, employee_views
 
 # Create DRF router
 router = DefaultRouter()
 router.register(r'companies', company_views.CompanyViewSet)
 router.register(r'departments', company_views.DepartmentViewSet)
+router.register(r'employees', employee_views.EmployeeViewSet)
+router.register(r'employment-records', employee_views.EmploymentRecordViewSet)
+router.register(r'role-duties', employee_views.RoleDutyViewSet)
 
 app_name = 'core'
 
