@@ -5,10 +5,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeesPage from './pages/EmployeesPage';
 import EmployeeDetailPage from './pages/EmployeeDetailPage';
-
-// Placeholder components - these will be created later
-const Search = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Search</h1></div>;
-const Upload = () => <div className="min-h-screen p-8"><h1 className="text-2xl">Bulk Upload</h1></div>;
+import SearchPage from './pages/SearchPage';
+import UploadPage from './pages/UploadPage';
 
 function App() {
   return (
@@ -48,19 +46,17 @@ function App() {
           </PrivateRoute>
         } 
       />
+      {/* Public search route */}
       <Route 
         path="/search" 
-        element={
-          <PrivateRoute>
-            <Search />
-          </PrivateRoute>
-        } 
+        element={<SearchPage />} 
       />
+      
       <Route 
         path="/upload" 
         element={
           <PrivateRoute>
-            <Upload />
+            <UploadPage />
           </PrivateRoute>
         } 
       />
